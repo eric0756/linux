@@ -1,0 +1,921 @@
+如何使用eclipse看代码
+-C/C++目录，file->new->C Project->Project name，使用已有目录的名字
+-C/C++目录下可以open和close一个工程
+-
+
+********************************************************
+上学期
+专题1
+********************************************************
+专题2-U-boot新手入门
+拷贝uboot压缩包到linux系统
+配置uboot，make forlinx_nand_ram256_config
+编译uboot，make ARCH=arm CROSS_COMPILE=arm-linux-
+生成uboot.bin,就是要烧写到板子里面的uboot程序，
+
+Uboot烧写，在第2季第19课已经学习过，裸机开发快速体验.wmv
+*从SD卡启动
+*选择format the nand flash->burn image from usb->flash u-boot
+insmod dnw_usb.ko, 安装usb驱动
+./dnw u-boot.bin 50000000
+
+uboot命令
+#help
+#printenv
+#print
+#setenv
+-setenv filename test.txt, 新增或修改
+-setenv filename, 删除
+#saveenv
+
+文件下载
+-虚拟机上运行一个tftp服务器
+-开发板运行一个tftp客户端，就可以通过网络传送文件了
+
+setenv ipaddr 192.168.1.100
+setenv serverip 192.168.1.107
+setenv ethaddr 00:40:5c:26:0a:5b
+
+板子ping不通PC的原因:
+-windows 防火墙
+
+PC ping不通虚拟机的原因:
+-/etc/init.d/iptables stop
+-setenforce 0
+
+不要用板子和PC直连的方式，要多ping几次才能ping通，
+
+我遇到的板子ping虚拟机网卡的问题:
+*板子->主机物理网卡->主机虚拟网卡->虚拟机网卡
+*板子->路由器->主机物理网卡->主机虚拟网卡->虚拟机网卡
+-网线连接到主机和板子，从板子ping主机的物理网卡可以ping通，但是ping主机的虚拟网卡ping不通
+
+如果换成下面的方式，则通:
+*板子->路由器->主机物理网卡->虚拟机网卡,这里是禁用主机的虚拟网卡，当时主机不能上网，所以建立一个虚拟网卡用于主机和虚拟机能互通，
+现在添加了路由器，主机物理网卡连接上，那么主机和虚拟机之间的通信就无需借助主机的虚拟网卡了，直接用真实的网卡
+也就是说，主机的物理网卡和主机的虚拟网卡不能同时使用，会有冲突。
+
+因为从主机ping板子，板子是不会回的。所以中间搭建一个交换机，大大增加ping通的几率
+
+ping要分段:
+-板子ping交换机
+-板子ping主机物理网卡
+-主机ping虚拟机网卡
+
+配置文件:
+vi /etc/xinetd.d/tftp
+/etc/init.d/xinetd restart
+netstat -a | grep tftp
+
+MMU映射之前使用50008000,映射之后用c0008000
+
+通过tftp下载uImage
+tftp 0xc0008000 uImage，下载内核
+
+bootm 0xc0008000
+md
+mm
+nand erase 0x400000 0x500000, 开始地址和长度
+nand write 0x50008000 0x400000 0x500000
+nand read 0x50008000 0x400000 0x500000
+
+自动跳转到内核
+bootcmd, 环境变量
+bootcmd=nand read 0xc0008000 0x200000 0x500000;bootm 0xc0008000
+
+自动从flash读取内核到ram，然后运行:
+setenv bootcmd nand read 0xc0008000 0x200000 0x500000 \; bootm 0xc0008000
+
+自动从tftp服务器读取内核到ram，然后运行内核:
+setenv bootcmd tftp 0xc0008000 uImage \; bootm 0xc0008000
+********************************************************
+嵌入式linux内核制作
+linux系统架构
+用户空间，内核空间，那么用户程序就无法破坏操作系统的寄存器或资源
+
+通过系统调用和硬件中断可以从用户空间转移到内核空间。
+
+linux内核架构
+-system call interface
+-process management
+-memory management
+-arch，和cpu相关的代码
+-device drivers
+-virtual file system
+-network stack
+
+linux内核源代码
+*如何下载
+-www.kernel.org
+*目录结构
+-arch, archtecture，
+-documentation
+-drivers
+-include
+-fs, 各种文件系统的实现代码
+-net，网络，实现网络协议
+*代码管理
+
+********************************************************
+第2课-Linux内核配置与编译
+为什么要配置内核:选出需要的,去掉不要的.
+-根据硬件需求
+-根据软件需求
+
+方法:一定是在内核代码顶层命令来运行的
+make oldconfig, 就是把当前运行的linux内核的配置load进来
+make config, 基于文本交互模式
+make menuconfig,就是把当前运行的linux内核的配置load进来基于界面交互模式
+<M>内核模块,E.o, D.o, 用于动态加载到内存，节省内存
+<*>静态连接到内核映像里面
+
+内核配置的结果保存在什么地方:.config
+配置原则:
+-基于已有的配置文件进行配置
+-不知道怎么配置的保持默认
+
+pc的linux内核配置位置:
+/boot/config
+
+把配置文件拷贝到当前目录，可以基于这个配置进行配置
+cp /boot/config-2.6.32-279.el6.i686 ./
+
+ARM系列板子的配置文件
+arch/arm/configs/
+
+编译所有.o, .ko:
+make
+
+编译内核
+make zImage, 这个内核要小于512k
+make bzImage
+make bzImage V=1, 会输出很多编译信息
+
+编译好的内核放在: 
+arch/<cpu>/boot/目录下
+
+编译内核模块, 结果会散落在各个目录下
+make modules
+
+归集，打包内核模块
+-make modules_install，把散落的.ko内核模块拷贝到/lib/modules下,为打包做准备，这条目录必须在linux最上层目录下执行
+-make install, 会帮你把bzImage, system.map更名并拷贝到/boot下，并且更新各种软连接文件
+-mkinitrd initrd-2.6.39 2.6.39, 把2.6.39目录打包，mkinitrd是一个工具，任意目录下执行都可以，
+因为这个命令会自动在/lib/modules下找
+-mkinitrd -o /boot/initrd.img-2.6.10 2.6.10, 有些系统使用这种格式
+
+安装内核
+-cp arch/x86/boot/bzImage /boot/vmlinuz-2.6.39
+-cp initrd-2.6.39 /boot/
+-修改/etc/grub.conf, 启动项修改，主要修改内核和内核模块的名字，有些系统是修改/boot/grub/menu.lst
+
+uname -r， 查看当前内核
+
+内核：运行在内存中
+app和文件系统：存放到硬盘或flash，所以更新内核之后，看到的这些文件是一样的
+
+清理内核代码：
+-配置阶段，产生了.config
+-编译过程中产生很多.o
+
+make clean, 清理.o(.ko)文件，不清理.config
+make distclean, 清理.o(.ko)文件，也清理.config
+
+模块编译时的-C,-M:
+KERNELRELEASE 是在内核源码顶层Makefile中定义的一个变量，在第一次读取本地Makefile的时候，
+KERNELRELEASE为空，是没有定义的，所以走else分支。
+-C $(KDIR) 指明跳转到内核源代码目录下读取那里的Makefile(这里定义了KERNELRELEASE);
+-M $(PWD) 指返回到当前工作目录继续读入和执行当前的Makefile。
+
+all: hello.o; hello.o 默认的规则是gcc -c -o hello.o hello.c, 所以会生成hello.o, 但是不会生成all,因为没有生成all的规则
+
+all: hello.o; 既生成hello.o也生成all, 因为all也有源材料和规则
+	gcc -o all hello.o
+	
+all: hello.o; 即使all有源材料和规则, 但是因为声明all为伪目标,所以不生成all
+.PHONY all
+	gcc -o all hello.o
+	
+
+	
+
+		
+
+
+********************************************************
+嵌入式linux内核制作
+*make distclean,清除
+*cp config-file .config
+*make menuconfig ARCH=arm, 默认是x86，这里制定会运行在arm上
+*make uImage ARCH=arm CROSS_COMPILE=arm-linux-, 编译内核
+-有个错误
+
+mkimage，这是一个工具，给image加一个头的，在uboot_ok6410/tools里面有
+cp mkimage /bin/
+
+uboot, kernel, rootfs, 3个文件缺一不可，kernel在启动到最后会挂载根文件系统
+
+uImage是zImage经过压缩得来的，压缩工具是mkimage. uboot目前只支持uImage启动,不支持zImage启动
+********************************************************
+嵌入式文件系统
+rootfs, 根文件系统，第一个文件系统，必须有的
+-如何建立根文件系统目录与文件, 创建了目录之后, 要填充bin etc lib dev目录下的文件
+-挂载根文件系统到内核
+
+文件系统: 目录 + 文件
+文件系统: 目录 + 文件的加载方式
+
+*mkdir rootfs
+cd rootfs
+mkdir bin dev etc lib proc sbin sys usr mnt tmp var
+mkdir usr/bin usr/lib usr/sbin lib/modules
+
+*创建设备文件，有2个是linux启动的时候必须要的
+cd rootfs/dev
+mknod -m 666 console c 5 1
+mknod -m 666 null c 1 3
+
+注意: mknod 创建一个特殊文件对应一个设备, 权限是666, 这里创建了名字为console, c为字符设备, 主设备号为5,次设备号为1
+
+*加入配置文件，和体系结构无关
+tar etc.tar
+cp etc/* rootfs/etc/ -rf
+
+*添加内核模块
+-cd ../linux-ok6410
+-make modules ARCH=arm CROSS_COMPILE=arm-linux-
+-make modules_install ARCH=arm INSTALL_MOD_PATH=../rootfs
+
+*编译和安装busybox
+-busybox提供bin目录下的小工具
+-tar xvzf busybox-1.13.3.tar.gz
+
+*make menuconfig, 
+是否静态链接, yes
+--build busybox as a static binary
+
+用什么编译器
+--cross compiler, arm-linux-
+
+安装在哪里
+--installation, don't user, 应该是/home/l4/rootfs
+
+make,编译
+make install, 把工具拷贝到我们的安装目录/rootfs下
+
+第二个话题，挂载根文件系统
+-文件系统类型
+-initram
+-nfs
+
+文件系统类型
+-RAM和flash
+
+基于nandflash
+-yaffs2,ubifs, 可读写
+
+基于norflash
+-jffs2, 可读写
+
+基于内存的文件系统
+-ramdisk,指定大小
+-initramfs,不指定大小，可以扩展, 不能保存用户的数据
+
+基于网路的文件系统
+-NFS，开发阶段使用
+
+一个linux系统中一般使用多个文件系统
+-根文件系统(一般使用initram快速启动), 再加一个flash的文件系统(可保存数据)
+
+*initramfs
+-ln -s ./bin/busybox init, 建立软连接？
+-到linux下, make menuconfig, General setup -> Initial RAM filesystem and RAM disk
+-设置根文件系统的位置, /home/season4/1st/l4/rootfs
+-make uImage ARCH=arm CROSS_COMPILE=arm-linux-,把uImage拷贝到tftp目录
+-通过串口设置环境变量,setenv bootargs noinitrd console=ttySAC0,115200
+-然后tftp下载，bootm启动，就挂载了文件系统了
+
+*************
+uImage: 包括kernel和压缩的文件系统, 内核启动的时候会把压缩的文件系统解压缩到ram中
+频繁更改文件系统，通过nfs开发比较方便
+
+-首先把linux配置成不需要initram系统的
+-然后在网络配置中，添加支持NFS,rootfile system on NFS
+-然后编译
+
+设置启动参数，内核以什么参数来启动，文件系统就从nfs指定地方加载了
+setenv bootargs noinitrd console=ttySAC0,115200 init=/init root=/dev/nfs rw nfsroot=192.168.31.105:/home/season4/1st/l4/rootfs,ip=192.168.31.106:192.168.31.107:192.168.1.1:255.255.255.0::eth0:off
+
+检查主机是否配置好nfs服务器:
+vi /etc/exports
+/home/rootfs *(rw,sync,no_root_squash)
+/etc/init.d/nfs restart
+
+使用nfs加载文件系统之后，pc机直接在上面放文件，在板子上查询很好查询
+
+连网安装wireshare:
+yum install wireshark,安装wireshark
+yum install wireshark-gnome
+
+yum erase wireshark,卸载 wireshark
+rpm -qa | grep wire
+whereis wireshark
+
+*****************************************************************
+内核模块基础
+zImage, 所有组件都在这里，但是很费内存
+动态加载的话，就能节省很多ram
+
+什么是内核模块:
+-不被编译进内核文件,zImage,bzImage
+-动态的安装和卸载
+
+安装与卸载
+-insmod /home/dnw_usb.ko
+-rmmod dnw_usb
+-lsmod
+
+**************
+内核模块设计
+#include <linux/init.h>
+#include <linux/module.h>
+static int hello_init()
+{
+	printk(KERN_WARNING"hellow world");
+	return 0;
+}
+static int hello_exit()
+{
+	printk(KERN_WARNING"end world");
+	return 0;
+}
+module_init(hello_init);//加载函数
+module_exit(hello_exit);//卸载函数
+
+三要素:
+-头文件
+-加载函数
+-卸载函数
+
+insmod 执行的时候 会调用module_init指明的函数hello_init
+rmmod 执行的时候 会调用module_exit指明的函数hello_exit, 模块要在/lib/modules/$(uname -r) 下才能卸载
+mkdir -p /lib/modules/$(uname -r)
+
+编写makefile和编译内核模块
+C,大C代表进入到下面的路径执行命令
+
+obj-m := hello.o
+hello-objs := file1.o file2.o
+KDIR := /Home/linux
+all:
+	make -C $(KDIR) M=$(PWD) modules CROSS_COMPILE=arm-linux- ARCH=arm
+	
+clean: rm -f *.o *.ko *.order *symvers
+	
+*************************************************************
+模块可选信息
+-模块声明
+-模块参数
+-符号输出
+
+*模块声明
+-MODULE_LICENSE("GPL")
+-MODULE_AUTHOR("")
+-MODULE_DESCRIPTION("")
+-MODULE_VERSION("V1.0")
+
+*模块参数
+int a = 3;
+module_param(a,int,S_IRUGO | S_IWUGO);//声明模块参数
+insmod helloworld.ko a=10, 这样, 模块参数a=10了
+
+char *p;
+module_parm(p,charp,S_IRUGO | S_IWUGO);
+insmod helloworld.ko p=hello
+
+*符号输出
+-EXPORT_SYMBOL(add), 声明这个符号可以给其他模块使用
+-在使用add的模块中,extern add(int a, int b)
+*****************************************************************
+Linux内存管理
+子系统由以下几个部分组成：
+-系统调用
+-进程管理
+-内存管理
+-文件系统
+-网络协议栈
+-Arch
+-设备驱动
+
+内存管理子系统
+-内存管理模型
+-地址映射管理
+-物理地址分配管理
+
+职能：
+-物理内存的分配管理
+-虚拟地址与物理地址的映射管理
+
+看课件经典图, 对于物理内存有:
+低端内存:0~896M
+高端内存:896M以上
+
+用户空间, 虚拟地址:
+0~3G
+
+内核空间, 虚拟地址：
+直接映射区：3G~3G+896M，这部分是直接映射到物理地址0~896M
+vmalloc区: 可以映射到高端或低端内存
+永久内核映射区:固定用于访问高端内存的
+固定映射的线性地址区:访问固定的寄存器地址
+
+物理内存分配:
+malloc、vmalloc分配一段虚拟内存的时候，并没有分配物理内存，而是访问虚拟地址的时候才会分配实在的物理内存
+机制是通过缺页异常
+kmalloc调用的时候会分配物理内存和虚拟地址
+
+空闲页框: 物理空闲内存池
+**********************************************************
+进程管理子系统
+-linux进程要素
+-进程调度
+
+
+进程4要素
+-有一段程序供其执行
+-内核空间堆栈
+-要有一个pcb，进程控制块 task_struct
+-有独立的用户空间
+
+有独立的用户空间-Y->进程
+|
+N
+|
+有共享的用户空间-Y->用户线程
+|
+N
+|
+内核线程
+
+linux进程状态：就绪，执行，阻塞
+-TASK_RUNNING,就绪或执行
+-TASK_INTERRUPTIBLE, 阻塞态, 可以通过发送信号唤醒
+-TASK_UNINTERRUPTIBLE，阻塞态,信号不可以唤醒
+-TASK_KILLABLE, 阻塞态,只原理类似有发送SIGKILL信号可以唤醒
+-TASK_TRACED,正在被调试
+-TASK_DEAD,进程退出时，调用do_exit
+
+PCB:进程控制块
+-pid
+-status
+-priority
+
+linux进程的调度
+-从就绪的进程中选出最适合的一个来执行
+
+要掌握哪些知识点:
+-调度策略
+-调度时机
+-调度步骤
+
+调度策略：
+-SCHED_NORMAL: 普通的分时进程
+-SCHED_FIFO: 先入先出的实时进程
+-SCHED_RR：时间片轮转的实时进程
+-SCHED_BATCH: 批处理进程
+-SCHED_IDLE: 只有在系统空闲时才能被调度执行的进程
+
+调度时机: 也就是schedule()函数什么时候被调用，linux是通过调用schedule()来实现调度的
+*内核主动调用。当当前运行进程进入阻塞状态时，会主动调用
+-current->state = TASK_INTERRUPTIBLE;
+-schedule();释放CPU
+
+*被动式，抢占式：用户态枪战(2.4,2.6)和内核态枪战(2.6)
+用户态抢占:
+-从系统调用返回用户空间
+-从中断处理程序返回用户空间
+内核即将返回用户空间的时候，如果need_resched标志被设置(有更高级的用户进程)，会导致schedule()被调用,即发生抢占
+
+-当某个进程耗尽它的时间片时，会设置need_resched标志
+-当一个优先级更高的进程进入可执行状态的时候，也会设置need_resched标志。
+
+用户态抢占缺陷
+如果内核线程一直运行，不返回到用户空间，那么就不会产生调度释放CPU给用户进程。
+直到这个内核线程执行完才能释放CPU，则降低实时性。
+
+2.6版本改进方式: 内核态抢占
+内核抢占可能发生在
+-中断处理程序完成，返回内核空间之前，谁的优先级高就执行谁，不管是在内核还是在进程
+-释放信号量的时候也可以发生抢占
+
+下列情况不可以发生内核抢占:
+-内核正在运行中断处理
+-中断上下文处理
+-进程正持有spinlock自旋锁,writelock/readloc读写锁等，不能被抢占。否则由于抢占将导致其他进程长期得不到锁，而让系统处于死锁状态。
+-内核正在执行scheduler程序时,不能抢占。
+
+为了保证linux内核在上述情况不会被抢占，抢占式内核使用了一个变量preempt_count,称为内核抢占数。
+当以上任何一种情况进入，preempt_count会加1，当内核调度程序运行时，判断preempt_count>0则不运行抢占。
+
+调度的步骤，实际上是schedule函数是怎么完成调度的：
+-清理当前运行的进程，退出CPU的清理工作
+-根据策略从就绪队列中选择出要运行的进程
+-设置新进程的运行环境，sp堆栈指针之类的
+-进程上下文的切换
+
+****************************************************
+linux内核链表深度分析
+-内核链表的使用
+-内核链表的实现
+-内核链表的移植
+
+linux内核链表属于:双向循环链表
+传统链表:
+-链表指针指向和元素相关的类型
+
+内核链表
+-链表指针指向一个统一的指针域(指针头)，指针指的位置是下一个节点指针的位置
+struct list_head
+{
+   struct list_head *pre;
+   struct list_head *next;
+};
+-使用内核链表，插入，删除元素，只需要调用函数就可以
+INIT_LIST_HEAD, 创建链表
+list_add, 添加节点
+list_add_tail, 添加节点到链表尾巴
+list_del, 删除节点
+list_entry,获取节点信息
+list_for_each,遍历链表
+
+学习内核代码最好看内核代码。
+
+#include <linux/list.h>
+struct score
+{
+    int num;
+    int english;
+    int math;
+    struct list_head list;
+};
+
+struct list_head score_head;
+struct score stu1;
+struct list_head *pos;
+
+int mylist_init()
+{
+    score *temp;
+    INIT_LIST_HEAD(&score_head);
+    
+    stu1.num = 1;
+    stu1.english = 90;
+    stu1.math = 50;
+    
+    list_add_tail(&(stu1.list),&score_head);
+    list_for_each(pos,&score_head)
+    {
+   	temp = list_entry(pos, struct score, list); //pos 减去差值就可以得到score的地址
+    }
+}
+void mylist_exit()
+{
+    list_del(&(stu1.list));
+}
+
+module_init(mylist_init);
+module_exit(mylist_exit);
+
+可以把这些链表函数移植到应用程序中去。
+****************************************************
+Liux系统调用
+用户空间的应用程序调用内核空间的函数。
+每个系统调用有一个编号，在swi执行的时候携带编号参数提交给内核
+内核根据编号,在sys_call_table找到相应的入口
+
+read
+swi + r7=2
+内核就从sys_call_table选取第2个系统调用进行调用
+
+内核代码在:
+entry-common.s, vector_swi
+
+实现新的系统调用：
+-在kenel写系统调用函数体
+void sys_pk()
+{
+	printk("this is sys call test.");
+}
+
+-在call.s的sys_call_table里面要添加sys_pk，要加在最后面
+-unistd.h, 添加宏，定义新的系统调用编号
+-用户应用程序来进行系统调用
+void pk()
+{
+    __asm__ (
+    "ldr r7,=363 \n"
+    "swi \n"
+    :
+    :
+    :"memory");
+}
+
+void main()
+{
+    pk();	
+}
+-编译这个应用程序然后放到rootfs中, 板子起来之后运行这个执行程序
+
+****************************************************
+Linux开发前奏
+概述
+驱动分类
+*常规分类法
+-字符设备，按字节为最小访问单位的设备，这种设备通常支持open,close,read,write,例如串口，led，按键
+-块设备，最小访问单位为块(通常512字节)，flash，SD
+-网络设备，可以是硬件设备如网卡，也可以是纯粹的软件设备，比如环回2接口lo，一个网络接口负责发送和接收数据报文
+*总线分类法
+-USB设备，PCI设备，平台总线设备
+
+驱动学习方法
+-驱动模型
+-硬件操作
+
+驱动学习步骤:
+-驱动程序模型(写框架代码)
+-硬件操作实现
+-驱动程序测试
+
+驱动学习切忌: 驱动学习初期，请不要过多的去阅读内核代码
+必要的内核代码，老师会带着我们读，其他的内核代码就没必要读了。
+**************************************************************
+硬件访问技术
+-访问流程
+-地址映射
+-寄存器读写
+
+硬件访问实质: 访问寄存器
+
+
+地址映射
+-linux中必须使用虚拟地址，所以把要访问的物理地址转换成虚拟地址，然后访问虚拟地址
+-动态映射，void *ioremap(physaddr, size)
+-静态映射，用户事先指定映射关系，内核启动时，自动将物理地址映射为虚拟地址
+--映射关系的指定，填充map_desc,  virtual(虚拟地址), pfn(物理地址页帧号)， 通过__phys_to_pfn(物理地址)可以获得pfn
+--告诉内核，通过s3c_iodesc[]数组告诉内核
+--内核启动时通过iotable_init(s3c_iodesc, ARRAY_SIZE(s3c_iodesc))完成静态的建立
+
+寄存器访问:
+unsigned ioread8(void *addr)
+unsigned ioread16(void *addr)
+***********************************************
+字符设备驱动模型
+使用字符设备驱动程序
+
+*编译安装驱动模块
+*字符设备文件
+-应用程序通过文件名找到字符设备文件->通过主设备号来找到对应设备驱动程序调用来控制设备
+-创建字符设备文件方法
+--mknod /dev/文件名 c 主设备号 次设备号(0~255)，主设备号可以通过cat /proc/devices 查询到设备对应的主设备号
+
+例子:
+一个应用程序写设备(write_mem)，另外一个应用程序读设备
+
+查看一个函数需要什么头文件，可以通过man 2 open
+
+./write_mem  提示找不到
+arm-linux-readelf -d write_mem
+NEEDED     Share library:[libc.sa.6]，这里是因为需要这个动态链接库，但是系里面没有
+所以可以通过静态编译解决。
+***********************************************
+字符设备驱动编程模型
+1.设备描述结构cdev
+2.字符设备驱动模型
+3.范例驱动分析 
+
+要找到各种驱动模型的共性。
+
+设备驱动模型， 90%都使用这个模型去套
+-驱动初始化
+--分配设备描述结构
+--初始化设备描述结构
+--注册设备描述结构
+--硬件初始化
+-实现设备操作
+-驱动注销
+
+设备描述结构:每一种设备都有专门的结构来描述它，字符设备使用的描述结构是cdev
+
+字符设备描述结构: cdev
+struct cdev {
+    struct kobject kobj;
+    struct module *owner;
+    const struct file_operations *ops;//设备操作
+    struct list_head list;
+    dev_t dev;//设备号，高12bit为主设备号，低20位为次设备号
+    unsigned int count;//设备数
+};
+
+ls -l /dev/ 这里放了所有的设备文件，可以查询设备文件的主次设备号
+一个设备驱动程序对应多个物理串口，但是每一个物理串口都有自己的设备文件，这些设备文件的主设备号
+是一样的，但是次设备号不一样。
+
+字符设备文件与字符驱动程序如何建立对应关系？
+答案: 主设备号。
+
+驱动程序用什么来区分串口1和串口2设备文件:
+答案: 次设备号
+
+dev_t dev = MADEV(主设备号，次设备号)
+主设备号 = MAJOR(dev_t dev)
+次设备号 = MINOR(dev_t dev)
+
+主设备号的分配方法:
+*静态申请
+-register_chrdev_region, 如果设备号已经被占用会申请失败
+
+*动态分配
+-alloc_chrdev_region,不会申请失败
+
+设备号注销:
+-unregister_chrdev_region
+
+file_operations *ops:并不是每一个操作函数都要实现的。
+
+描述结构-分配
+*静态分配
+struct cdev mdev;
+*动态分配
+struct cdev *pdev = cdev_alloc();
+
+描述结构-初始化
+cdev_init(struct dev *cdev, const struct file_operations *fops);
+
+描述结构-注册
+cdev_add(struct cdev *p, dev_t dev, unsigned count);
+-p,待添加到内核的字符设备结构
+count, 该设备的设备个数
+
+硬件初始化。
+
+第二步，实现设备操作
+-设备方法什么时候被调用
+-如何实现设备方法
+
+*struct file
+-linux系统中，每打开一个文件，都在内核中关联一个struct file,内核在打开文件时创建，在文件关闭后释放。
+-重要成员:loff_t f_pos; struct file_operations *f_op;
+
+*struct inode
+每一个文件都关联一个inode,记录的是文件物理上的信息
+
+设备操作-read
+-设备驱动从设备寄存器读取数据
+-设备驱动将数据提交给应用程序
+--buff参数是来源于用户空间的指针, 这类指针不能被内核代码直接饮用，必须通过专门的函数
+--int copy_from_user(void *to, const void __user *from, int n)
+--int copy_to_user(void __user *to, const void *from, int n)
+
+驱动注销
+-cdev_del
+
+范例代码分析: memdev.c
+
+总结:
+*编写驱动模块代码，编译完成，拷贝到rootfs
+*板子启动，insmod memdev.ko， 安装模块成功，则在cat /proc/devices 可查询设备驱动的主设备号
+*mknod /dev/memdev0 c 253 0, 建立和设备驱动对应的一个设备访问文件
+*./write_mem, ./read_mem, 对文件发起访问
+
+***********************************************
+驱动访问模型
+应用程序read/write ->内核?-> 驱动程序的read/write
+内核是怎么做到的?
+
+编译应用程序之后，通过arm-linux-objdump 来查看反汇编
+r7 =3;
+svc;系统调用指令，pc指针会从用户空间进入到内核空间,入口是固定的，取3出来,查找一个系统调用表, 查到什么调用什么
+
+代码分析:
+*找到entry-common.s
+*找到vector_swi,这就是入口
+*Get system call number
+*从sys_call_table(call.s)取出第3个函数sys_read进行调用
+*sys_read 可以查找read_write.c文件
+*SYSCALL_DEFINE3(read,unsigned int, fd, char __user *buf, size_t, count)
+-vfs_read, file->f_op->read()
+
+***********************************************
+字符设备控制技术
+
+设备控制理论
+配置波特率，应用层可以采用控制系统调用
+int ioctl(int fd, unsigned long cmd, ...)
+-cmd,发送给设备的控制命令
+-...，可选的参数，存在与否依赖于第2个参数
+
+内核对应的方法:
+2.6.36之前
+long (*ioctl)(struct inode *node, struct file *filp, unsigned int cmd, unsigned long arg)
+
+2.6.36之后
+long (*unlocked_ioctl)(struct file *filp, unsigned int cmd, unsigned long arg)
+
+设备控制实现：
+*定义命令
+-type, 8bit, 表明属于哪个设备的命令
+-number, 同一设备的不通命令
+-direction, _IOC_READ, _IOC_WRITE, _IOC_NONE
+-size,参数长度
+
+linux提供了_IOxx的宏来帮助定义命令。
+例：
+#define MEM_MAGIC 'm'
+#define MEM_SET _IOW(MEM_MAGIC,0,int)
+
+unlocked_ioctl里面就switch 各种命令
+*实现设备方法
+例子:
+memdev.c
+led.c
+***********************************************
+
+USB 驱动
+full speed: USB 1.1 12Mb/s
+high speed: USB 2.0 480Mb/s
+super speed: USB 3.0 十倍于USB 2.0
+
+标准接口:
+标准A口:最常用的USB口
+标准B口:仿真器的usb接口
+mini-usb: 比micro-usb大一点
+micro-usb: android手机充电口
+
+信号线
+4根信号线
+-USB电源，5V，红
+-地线，黑色
+-数据线D+
+-数据线D-
+当两者电压差大于200mv时代表1，小于200mv代表0
+
+USB拓扑结构
+主机->根集线器->设备
+              ->集线器hub
+              
+USB主控制器规格有:
+-OHCI, 非PC系统，USB1.1, 嵌入式系统
+-UHCI, pc usb1.1
+-EHCI, USB2.0  
+***********************************************            
+USB协议
+USB设备逻辑结构
+假如一个设备有音频，视频，按钮功能
+配置，其实就是功能的组合
+接口，对应一个功能
+端点，寄存器，操作寄存器让接口工作起来
+
+为什么电脑能认出是鼠标而不是U盘呢？
+-是因为设备内部固定格式的数据
+
+USB的描述符：
+设备描述符，配置描述符，接口描述符，端点描述符，字符串描述符
+
+设备描述符 USB specification 2.0
+
+传输->事物->包->域
+
+传输(transfer)种类:
+中断传输，批量传输，同步传输，控制传输
+
+事务(transaction)种类:
+-In事务
+-Out事务
+-Setup事务
+
+包(packet)种类:
+-令牌包(setup)
+-数据包(data)
+-握手包(ack)
+-特殊包
+
+一个包由多个域构成:
+同步域(SYNC), 标识域(PID),地址域(ADDR)，端点域(ENDP)，帧号域(FRAM)
+数据域(DATA)，校验域(CRC)
+
+USB设备枚举
+-获取设备描述符
+-复位
+-设置地址
+-再次获取设备描述符
+-获取配置描述符
+-获取接口、端点描述符
+-获取字符串描述符
+
+
+
+
+
+
+
+

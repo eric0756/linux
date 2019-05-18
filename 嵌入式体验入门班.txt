@@ -1,0 +1,515 @@
+韦东山视频_S3C6410_第1期裸板
+linux系统下c程序开发完全手册
+http://www.verycd.com/topics/2924715/
+
+OK6410基本信息:
+****************************************
+**    u-boot 1.1.6                    **
+**    Updated for OK6410  TE6410 Board  **
+**    Version (2012-09-23)          **
+**    OEM: Forlinx Embedded           **
+**    Web: http://www.witech.com.cn   **
+****************************************
+
+CPU:     S3C6410 @532MHz
+         Fclk = 532MHz, Hclk = 133MHz, Pclk = 66MHz, Serial = CLKUART (SYNC Mode
+)
+Board:   SMDK6410
+DRAM:    256 MB
+Flash:   0 kB
+NAND:    2048 MB
+
+SD 卡启动: on 4 5 6 7 8
+
+Nand flash启动: 4 5 8 on
+
+USB手动安装:
+*一定要使用eboot擦除 all nand flash
+*格式化SD卡, 把BIOS mmc_ram256.bin使用SD_Writer.exe烧写到SD卡中.
+-目录Linux-3.0.1\Linux烧写工具
+-烧写过程中,win7下要按format
+*设置开发板从SD卡启动 45678, 按住空格键，打开板子电源就可以进入
+-波特率115200
+
+一键安装linux
+*先eboot擦除所有nand flash
+*SD_Writer.exe 烧mmc.bin 
+*把uboot.bin, zImage, system系统文件按顺序拷贝到SD卡,并改好名字
+*设置从SD 卡启动
+
+
+使用SD_Writer.exe把bootloader写入到SD卡
+DNW: 用于下载uboot和linux到nand flash的
+
+http://bbs.witech.com.cn/thread-43493-1-1.html
+http://bbs.witech.com.cn/thread-44279-1-1.html
+
+
+系统从SD卡启动之后
+*要先格式化板子的nand flash
+*然后选择通过USB download uboot,这个时候uboot会等待传送uboot
+*此时用usb线连接电脑和板子，在虚拟机里面连接这个usb，然后安装usb的驱动
+-进入ARM-Tools,找到dnw_usb.ko, 然后insmod dnw_usb.ko 动态加载驱动
+*使用dnw来下载程序给板子
+-dnw u-boot.bin 50000000, 50000000是uboot的位置, 50008000是应用程序的位置
+**************************************************
+Linux的定制安装
+*新建虚拟机的时候,不要立刻安装,这个时候会是简易安装
+*在虚拟机上cdrom装载iso,运行 
+*在各个定制勾选需要的工具,然后安装, 只选开发工具和web 服务
+**************************************************
+linux 命令:
+如何切换到root: sudo su
+如何退出root: exit
+添加用户: useradd smb, 在home下面就有目录
+修改密码: passwd smb
+切换用户: su eric
+关机: shutdown now
+拷贝: cp src dst, cp -r test /
+剪切: mv src dst
+删除: rm log.c, rm dir1 -r
+创建目录: mkdir dir1, mkdir -p dir1/dir2/dir3
+进入目录: cd home, 
+当前目录: pwd
+察看: ls, ls -a
+隐含文件以.开头的. mv a.c .a.c
+打包: tar cvf test.tar test/
+解包: tar xvf test.tar
+打包压缩: tar cvzf test.tar.gz test/
+解压解包: tar xvzf test.tar.gz
+zip解压缩: unzip test.zip
+
+
+用户有三种:
+文件所有者,和所有者同组的用户,其他用户
+
+访问权限:
+读,写,执行
+$ls -l sobsrc.tgz
+-rw-r--rwx
+这里第一位'-'代表非目录文件,'d'代表目录
+后面每3bit代表一种用户的读,写,执行权限.
+chomod
+chmod [who][+|-|=][mode] 文件名
+参数:
+who:
+   u 所有者
+   g 同组用户
+   o 其他用户
+   a 所有用户
+例子: chmod g+w hello.c
+用数字修改权限:
+4-r
+2-w
+1-x
+chmod 761 hello.c
+
+df: 察看磁盘使用情况
+df
+df -k
+
+df --help; 若内容太多，可以shift + pageup/pagedown
+
+du: 察看目录的大小
+du -b ipc
+
+ifconfig: 察看或配置网络
+ifconfig
+ifconfig 192.168.0.1;配置ip地址
+ifconfig eth0 down ; 暂停eth0
+ifconfig eth0 up  ;恢复eth0
+
+netstat: 察看网络状态
+netstat -a
+
+rpm: 软件安装
+rpm -ivh tftp.rpm; 安装
+rpm -qa ;有哪些包已经安装了
+rpm -e name ;卸载某个包
+
+mount: 要使用光驱, 必须把光驱挂载到/mnt/目录下
+nux挂载光驱
+如下：
+1、mount -t iso9660 /dev/cdrom /mnt iso9660是挂载光驱是必须要的参数 /dev/cdrom是实际光驱的位置， /mnt就是被挂载的地方
+-如果出现:no medium found on /dev/sr0, 主要是因为你的CDROM没有连接
+*可以通过点右下角的光盘进行连接
+*可以在虚拟机设置上设置：connect at power on, connected
+2、cd /mnt 下即可找到光驱的文件
+umount /mnt/
+挂载, 其实就是把光驱的内容倒到某个目录里面去
+有时候mount出现mount you must specify the filesystem type，在设置里面勾选设备状态已连接。
+
+*要给eth0设置一个ip, ifconfig eth0 192.168.1.108,则互ping可以通
+*要禁止linux防火墙
+*禁止selinux， setenforce permissive  或永久禁止: /etc/selinux/config文件中的SELINUX="" 为 disabled ，然后重启。
+*
+
+/usr/sbin/sestatus, 查看目前Selinux的状态
+get enforce； 查看selinux的enforce状态
+
+
+
+find: 查找
+格式: find 路径 -name '文件名'
+find ./ -name 'co*'
+find ./ -name 'test'
+
+grep: 查找包含某个字符串的文件
+grep "hello" ./ -rn
+
+top:察看cpu占用率, ctrl + c退出
+
+ps: 察看进程
+
+kill: 杀死某个进程
+kill 2683 ; 2683是进程号
+
+man: 帮助
+man grep
+
+禁止屏幕睡眠:
+setterm -powersave off -powerdown 0 -blank 0
+********************************************************
+文本编辑器: vi, Emacs
+模式: 
+命令行模式: 浏览
+
+插入模式:i在光标前插入文本,a在光标后插入文本,esc退出到命令行模式
+
+底行模式:保存,退出,列入行号, :wq
+
+命令行模式快捷键:
+yy: 复制当前行
+nyy: 复制多行
+p:粘贴
+dd: 删除当前行
+ndd:删除多行
+/name:查找, n, 下一个，N上一个
+G: 移动到文件尾把
+u: 取消上一次操作
+ctrl+r:取消撤消
+x:删除光标处字符
+X:删除光标前字符
+D:删除光标所在处到行尾
+
+底行模式:
+:w
+:q
+:q! 强行退出
+:wq ;保存退出
+:w hello2.c 保存为另外文件名
+:set nu ;显示行号
+:set nonu ;取消行号
+
+hjkl:光标[左下上右]移动,同方向键
+0:移至行首
+shift + 0:移至文件尾
+$:移至行尾
+Enter:移至下行首
+H:移至屏幕上端
+M:移至屏幕中间
+L:移至屏幕下端
+ctrl+r:取消撤消
+ctrl+c:退出当前状态
+
+*****************************************
+Linux网络设置
+齿轮图：VMWARE的网络, Linux的网络设置
+Briged:
+-主机充当桥：虚拟机和外部网络的桥, 虚拟机就像普通机器连接到网络一样
+-如果网络中能提供多个IP地址,则使用桥接方式
+-局域网中,虚拟机就像一台有物理网卡的机器一样
+-要有路由器
+NAT:
+-如果网络中只能提供一个IP地址,则使用NAT方式
+-虚拟机和主机使用同一个IP地址,虚拟机不能被外部发现
+-虚拟机可以找到外部网络,但虚拟机不能被外部发现, 外部网络只能发现主机
+Host-only:
+-如果安装虚拟机的主机没有连接任何外部网络,则使用主机模式,主机和虚拟机间可以互相访问
+-就像两台计算机用网线直接连接到一起一样
+
+Linux网络设置
+ifconfig
+/etc/init.d/network restart
+执行后出错，因为有冲突
+service NetworkManager stop 关闭这个
+
+-eth0:系统中第1块物理网卡, eth1
+-lo: 虚拟的回环网卡
+-virbro: 虚拟的网桥
+
+如果ifconfig没有出现eth0,
+1.修改eth0网卡的配置文件,将ONBOOT=no改成yes
+文件位置:/etc/sysconfig/network-scripts/ifcfg-eth0
+2./etc/init.d/network restart
+每一个网卡都有配置文件
+
+对于ubuntu如何配置本地IP和DNS
+*如何添加动态ip
+-进入/etc/network, vi interfaces, 添加如下
+auto eth0
+iface eth0 inet dhcp
+
+*如何添加静态ip
+-进入/etc/network, vi interfaces, 添加如下
+auto eth0
+iface eth0 inet static
+address 192.168.33.201
+netmask 255.255.255.0
+gateway 192.168.33.1
+
+*使配置生效
+-ifconfig eth0 down
+-ifconfig eth0 up
+-networking restart
+
+*配置DNS
+-/etc/resolv.conf, 添加如下信息
+nameserver 192.168.33.1
+
+
+*如果手动使用dpkg安装了一些软件, 编译出现unmet dependencies, 则使用
+dpkg -l  ;查询安装的软件
+dpkg -P samba-common   ;卸载samba-common
+**************************************
+Linux系统管理
+tftp服务器
+setup: 可以察看配置
+
+netstat -a|grep tftp;从统计数据作为输入,然后从中查找tftp
+vi /etc/xinetd.d/tftp ;察看tftp配置
+
+启动tftp:
+/etc/init.d/xinetd start
+
+NFS: 网络文件系统,远端的文件挂载到本地, 像windows的文件共享
+rpm -q nfs-utils ;察看有没安装
+vi /etc/exports ; nfs的配置文件
+/home 192.168.1.*(rw, sync, no_root_squash)
+rw, 可读可写
+sync, 一般只是修改在内存, 设置这个,会同步到文件
+
+NFS使用: linux与linux之间共享
+mount -t nfs servername:/shared_dir /localdir
+mount -t nfs 10.168.1.100:/home /mnt/nfs
+
+Samba:linux与windows之间共享
+*主机能上网的情况下
+首先要设置虚拟机网络,使得宿主机和虚拟机可以互ping通.
+-先设置虚拟机为桥接方式(虚拟机有独立网卡,通过宿主机接入局域网)
+-虚拟机setup,设置网卡ip为静态,ip和宿主机在同一个子网 
+-在pc端的防火墙->高级->入站规则->允许所有的ICMP
+-互ping成功
+
+*主机不能上网的情况下
+-禁止物理网卡
+-创建虚拟网卡，并把虚拟网卡的ip设置和虚拟机同一网段
+-禁用VmwareNEt1和8
+
+
+如何利用samba使得windows可以访问linux目录:
+$vi /etc/samba/smb.conf ;修改[root], 设置共享的目录和权限
+-path = /
+-valid users = eric
+-smbpasswd -a eric  ; 设置访问密码
+-关闭selinux,/etc/selinux/config 把SELINUX=enforcing 注释掉
+-/etc/init.d/smb restart ;重启samba服务
+-在pc上//192.168.1.107就可以访问linux的smb共享了
+
+Setup配置:
+system service: 列表中代表安装了的服务,有星代表系统起来的时候会开启的服务,
+
+wireshark: 端口抓报工具, 以前叫ethreal
+
+putty工具无法ssh,telnet连接linux的问题:
+*确保windows已经打开telnet服务
+-程序->打开或关闭windows功能->telnet客户端
+-开始——运行——输入 services.msc开启telnet服务
+
+*ubuntu安装ssh服务器
+apt-get install openssh-server
+ps -e | grep sshd ;查看是否安装
+
+如何修改linux默认启动命令行而非界面:
+vi /etc/inittab
+把d:5:initdefault这一行，把5改成3即可.
+
+env：察看环境变量,printenv也可以
+修改环境变量:
+*使用shell修改的环境变量只是一次性的，重启之后，环境变量恢复
+-PATH=$PATH:/home/eric
+*修改/etc/profile，会影响到所有用户, 修改~/.bashrc_profile 仅仅影响当前用户
+-vi ~/.bashrc_profile
+
+查询环境变量:
+echo $PATH
+
+*******************************************************
+SHELL脚本
+教程:
+http://www.cnblogs.com/xuqiang/archive/2011/04/27/2031034.html
+http://www.cnblogs.com/276815076/archive/2011/10/30/2229286.html
+
+1. 一个系统可以存在多个shell，可以通过cat /etc/shells命令查看系统中安装的shell，不同的shell可能支持的命令语法是不相同的。
+2. 可以通过echo $SHELL查看当前使用的shell
+通过set查看系统变量
+#!/bin/sh; #!用来指定该脚本用什么程序来解析
+sh hello.sh;执行文件
+./hello.sh; 执行文件,如果出现执行失败, 是当前用户没有该文件的执行权限,可以添加chmod u+x hello.sh
+以#号开头作为注释
+变量没有类型, 所有变量都有字符串组成
+a="hello";注意变量赋值的时候, a 和 = 之间不能有空格
+echo $a  ; 用变量的时候前面要$
+a=2
+echo "this is $and" ;程序认为and是一个变量
+echo "this is ${a}nd" ; 在字符串中用变量要$(a)
+
+默认变量:
+$# ;传入脚本的命令行参数个数
+$* ;所有命令行参数值,在各个参数值之间留有空格
+$0 ;命令本身, shell文件名
+$1 ;第一个命令行参数
+$2 ;第二个命令行参数
+
+局部变量:
+变量名前加入local, 则是局部变量
+
+if语句:
+if [exp]
+then
+    #code block
+fi
+
+if [exp]
+then
+else if [exp] //也可以elif
+     then 
+         #code block
+     else 
+         #code block
+     fi		 //每个if对应一个fi
+fi
+
+比较:
+比较操作  整数操作 字符串操作
+相同      -eq      =
+不同      -ne      !=
+大于      -gt      >
+小于      -lt      <
+大于或等于 -ge
+小雨或等于 -le
+为空      -z
+不为空    -n
+if [$a = $b]; =在这里不是赋值符号,所以两边可以有空格
+
+判断:
+-e 文件是否存在
+-f 文件是否普通文件
+-s 文件大小不为零
+-d 文件是一个目录
+-r 文件对当前用户可以读取
+-w 文件对当前用户可以写入
+-x 文件对当前用户可以执行
+例:
+#!/bin/sh
+folder=/home
+[ -r "$folder" ] && echo "can read $folder";当前面判断为真,则执行后面一句
+[ -f "$folder" ] || echo "not file";前面判断结果为假,才执行后面的语句
+
+
+数学运算： 
+
+a -eq b ：a == b
+a -ne b : a != b
+a -lt b : a < b
+a -le b : a <= b
+a -gt b : a > b
+a -ge b : a >= b
+
+string比较：
+string1 = string2
+string1 != string2
+string1 : string1 不是NULL，或者是没有定义
+
+if [ $a = "aa" -a $b = "bb" ] || [$c = "cc" -a $d = "dd" ];
+then
+  echo "success"
+fi
+
+逻辑运算符：
+
+! : not
+
+exp1 -a exp2 : a && b
+
+exp1 -o exp2 : exp1 || exp2
+
+
+for 循环
+for var in[list]
+do
+    #code block
+done
+
+#!/bin/bash
+for day in Sun Mon Tue Wed Thu Fri Sat ;变量名day前不用$,因为这个时候是赋值
+do 
+    #code 
+done
+
+for day in "Sun Mon Tue Wed Thu Fri Sat"
+do 
+    #code 
+done
+
+while循环基本结构:
+while []
+do 
+    #code
+done
+
+until []
+do 
+    #code
+done
+
+CASE语句:
+case "$var" in
+condition1)
+;;
+condition2)
+;; //双冒号代表break
+*)//*代表default
+default statements;;
+esac  //case结束
+
+#!/bin/bash
+echo "Hit a key, please"
+read Keypress //等待输入
+case "$Keypress" in
+[A-Z]) echo "Uppercase letter";;
+[a-z]) echo "Lowercase letter";;
+[0-9]) echo "Digit";;
+*) echo "default";;
+esac
+
+
+1. i=`expr $i + 1`;
+2. let i+=1;
+3. ((i++));
+4. i=$[$i+1];
+5. i=$(( $i + 1 ))
+
+以：“. 空格 ./name” 来执行，如果直接./name执行，虽然可以执行cd命令，但是结束后又回到了当前目录。因为shell的执行是放在临时环境中实现的，结束后自然退出！
+*******************************************************
+文件系统
+目录树是一个虚拟的概念，没有任何容量，所以不存在扩容的问题。
+
+
+
+
+      
+
+
+
+

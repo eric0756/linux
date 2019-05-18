@@ -1,0 +1,819 @@
+GCC程序编译
+预处理 编译 汇编 连接 输出
+gcc -I hello.c -L/home -o hello
+编译 链接 输出
+
+Gcc通过文件后缀名来区别输入文件的类别的.
+.a: 库文件
+.C .cc .cpp : C++文件
+
+gcc hello.c -o hello
+./hello
+
+gcc [options][filenames]
+-o output_filename: 指定输出文件名字,没指定,默认会是a.out
+
+-c: 只编译不链接成可执行文件.
+-g: 带有调试信息,gdb才可以调试
+-O: 对程序进行优化
+-O2: 优化更多
+
+-Idirname: 为gcc添加一个寻找头文件的路径
+#include <stdio.h> //在/user/include 目录里面找stdio.h
+gcc foo.c -I/home/include -o foo
+-Ldirname:增加链接库的路径,默认情况下,连接库的目录只有/usr/lib.
+          这个选项告诉ld连接器,首先到-L指定的目录中去寻找,然后再到系统预设路径中找.
+		  
+-lname: 指明要连接的库.如要连接库"libm.a", 则-lm就可以了
+gcc test.c -L/home/lib -lfoo -o test
+-static: 静态连接, gcc默认情况下采用动态连接的方式
+gcc -static hello.c -o hello
+-Wall: 生成所有的编译警告信息
+-w: 不生成任何编译警告信息
+-DMACRO: 意思是定义MACRO
+
+这些编译选项可以 放在hello.c前或后，-o hello一定要放最后 
+
+gcc -E *.c; 这样可以得到展开预编译宏后的结果，不编译不连接
+********************************************************
+GDB调试 
+GDB主要完成下面三个方面的功能
+*启动被调试程序
+*让被调试的程序在指定的位置停住
+*当程序被停住，可以检查程序状态，查变量值
+
+IDE的断点调试也是基于GDB的 。
+*编译程序 
+gcc -g test.c -o test
+
+*启动gdb,gdb关联程序
+gdb test
+gdb 
+file hello
+
+*在main函数设置断点
+break(b) main
+
+*运行程序 
+run
+quit
+
+next(n): 单步,不进入函数
+step(s): 单步，会进入函数 
+c: 连续运行 
+
+查看程序 
+list(l)
+
+b 函数名 
+b 行号
+b 文件名:行号 
+b 23 if i>10; 当条件满足，才会断住
+info break; 查看断点信息
+delete 5;删除断点， 号 
+printf i; 查看变量值，i是变量名
+finish：程序运行完当前函数
+watch 变量名: 查看变量 
+quit(q):退出gdb
+*************************************
+make file工程管理
+makefile 文件描述整个工程的编译链接规则，然后用make来解析。
+例子:
+hello:main.o func1.o func2.o
+    gcc main.o func1.o func2.o -o hello
+main.o:main.c
+    gcc -c main.c
+func1.o:func1.c
+    gcc -c func1.c
+func2.o:func2:c
+    gcc -c func2.c
+.PHONY:clean //声明clean为伪目标
+clean:   //没有依赖，只有动作的目标为伪目标
+    rm -f hello main.o func1.o func2.o
+
+运行的时候可以执行下面命令:
+make
+make clean
+make func1.o
+
+缺省的目标是第一个目标, 通常是all
+
+规则：用于说明如何生成一个或多个目标文件 ，如下 
+targets:prerequisites
+    command
+目标（产品）:依赖（原材料）
+    命令（加工）
+命令需要以【TAB】键开始
+第一条规则的目标是我们的最终目标，这里是hello
+
+make -f 文件名
+make:执行make的时候，默认寻找makefile或Makefile文件
+
+变量
+例子:
+obj=main.o func1.o
+hello:$(obj)
+	gcc $(obj) -o hello
+
+默认变量:
+$^: 代表所有的依赖文件
+$@: 代表 目标 
+$<: 代表第一个依赖文件
+
+hello: main.o func1.o func2.o
+	gcc main.o func1.o func2.o -o hello
+也可以下面这样：
+hello: main.o func1.o func2.o
+	gcc $^ -o $@
+	
+#号为注释
+@为取消回显示	
+
+*************************************************
+LINUX 文件和时间编程 
+所有的驱动都是以文件的方式提供的，所以这里要学会如何操作文件。
+
+*系统调用，这个依赖linux操作系统的 
+*C语言库函数
+
+系统调用的方式
+int creat(const char *filename, mode_t mode)\
+filename: 可以包含路径，缺省为当前目录 
+mode: 创建模式，即属性，读写执行属性
+S_IRUSR  可读 4
+S_IWUSR  可写 2
+S_IXUSR  可执行 1
+S_IRWXU  可读写执行
+
+文件描述 
+每个文件都有一个身份证号，即描述符
+打开文件的时候，由系统决定，范围0~max
+int open(const char *pathname, int flags)
+int open(const char *pathname, int flags, mode_t mode)
+flags:操作方式
+O_RDONLY    只读方式打开
+O_WRONLY    只写方式打开
+O_RDWR      读写方式打开
+O_APPEND    追加方式打开
+O_CREAT     创建一个文件
+O_NOBLOCK   非阻塞方式打开
+
+如果要使用O_CREAT，则要使用
+int open(const char *pathname, int flags, mode_t mode)
+close(int fd)
+fd: 文件描述符，文件创建或打开的时候来的，一个正整数
+
+int read(int fd, char* buffer, int length)
+
+int write(int fd, char* buffer, int length)
+
+int lseek(int fd, offset_t offset, int whence)
+offset: 文件指针向前移动3个字节，则offset为 -3，向后是+3
+whence: 移动的基准点
+-SEEK_SET: 相对于文件开头移动
+-SEEK_CUR: 相对于文件当前读写位置
+-SEEK_END: 相对于文件尾部
+返回移动之后当前文件指针相对于文件头的偏移 
+
+int access(const char *pathname, int mode)
+mode: 需要判断的属性, R_OK, W_OK
+返回值:0,测试成功-1，测试失败
+***********************************************
+使用C库函数来对文件进行调用，和linux平台无关，具有更好的可移植性
+FILE *fopen(const cha *filename, const char *mode)
+b, windows会区分是否二进制文件
+而linux文件不区分二进制文件和文本文件
+
+size_t fread(void *ptr, size_t size, size_t n, FILE *stream)
+读出来的数据放到ptr指向的地方，返回实际读到的数据量
+
+size_t fwrite(const void *ptr, size_t size, size_t n, FILE *stream)
+int fgetc(FILE *stream)
+int fputc(int c, FILE *stream)
+int fprintf(FILE *stream, char *format[arg])
+
+char *getcwd(char *buffer, size_t size) 获取当前路径
+size:buffer的大小，如果路径太长，buffer不够，会返回-1
+
+int mkdir(char *dir, int mode)
+dir: 目录名字
+mode: 权限 
+****************************************************
+时间编程
+格林威志时间
+日历时间， 从1970年1月1日到现在的秒数 
+time_t time(time_t *tloc)
+typedef long time_t
+
+日历时间转换为格林威治时间：
+struct tm * gmtime(const time_t *timep)
+
+日历时间转换为本地时间:
+struct tm *localtime(const time_t *timep)
+struct tm
+{
+int tm_sec;
+int tm_min;
+int tm_hour;
+int tm_mday;
+int tm_mon;
+int tm_year; //tm_year +1900 = 哪一年
+int tm_wday;//本周第几天
+int tm_yday;//本年第几天
+int tm_isdst;
+}
+
+tm *local: 会编译失败
+struct tm *local: 会编译成功
+
+tm只是一个结构，那么按什么方式显示出来，有下面的方式:
+char *asctime(const struct tm *temp)
+功能： 把tm格式时间转换为字符串
+
+char *ctime(const time_t *timetemp)
+功能: 把日历时间转换成字符串输出
+
+int gettimeofday(struct timeval *tv, struct timezone *tz)
+功能：从今天凌晨到现在过来多长时间
+struct timeval
+{
+int tv_sec;//秒
+int tv_usec;//微妙
+}
+可以精确到us，可以函数调用前后，调用这个来判断函数执行时间
+
+unsigned int sleep(unsigned int seconds)
+功能: 使程序睡眠多少秒
+
+void usleep(unsigned long usec)
+功能: 让程序睡眠多少微妙us
+
+*****************************************************
+进程控制原理
+进程：一个具有一定独立功能的程序的一次运行活动
+
+特点：
+*动态性
+*并发性，多个进程同时执行
+*独立性，进程和进程之间独立
+*异步性
+
+状态：
+就绪，执行，阻塞
+
+linux会把这三态划分为更多状态
+
+进程ID
+进程ID(PID): 标识进程的唯一ID
+父进程ID(PPID)
+启动进程的用户ID(UID)
+
+进程互斥：
+临界资源：操作系统中只允许一个进程访问的资源成为临界资源
+临界区：进程中访问临界资源的那段代码叫临界区
+
+进程同步：进程间先后通知执行，具有同步关系的一组并发进程称为合作进程。
+同步的方法：消息，事件
+
+进程调度：从一组就绪进程中选一个进程出来占用CPU运行
+
+调度算法：
+先来先服务
+短进程优先
+高优先级优先
+时间片
+
+死锁
+若无外力作用，这些进程永远不能再往前推进
+
+*****************************************************
+进程控制编程
+#include <sys/types.h>
+#include <unistd.h>
+pid_t getpid(void)
+获取本进程ID
+
+pid_t getppid(void)
+获取父进程ID
+
+创建进程-fork
+#include <unistd.h>
+pid_t fork(void)
+功能：创建子进程，子进程和父进程是同一个程序，子进程从fork返回地方开始运行，父进程创建子进程之后，先运行子进程还是父进程不一定
+fork被调用一次，却返回两次，可能3种返回值：
+1.父进程中，fork返回新创建的子进程PID
+2.在子进程中，fork返回0
+3.如果返回负值，则为出错
+
+void main()  
+{
+	int gData = 10;
+    pid_t pid;
+	pid = fork();
+    gData++;
+	printf("data %d.\n", gData);		
+}
+11
+11
+创建子进程，父子进程共享代码，但是多拷贝一份堆栈和数据空间，所以局部变量和全局变量都不是共享的，而是独自有一份的。
+
+pid_t vfork(void)
+区别：
+1. 
+fork: 子进程拷贝父进程的数据段
+vfork: 子进程与父进程共享数据段
+
+2.
+fork：父，子进程的执行次序不确定
+vfork: 子进程先运行，父进程后运行
+
+exec 函数族
+exec不会创建新的进程，其实就是调用另外一个程序进程替换自己,代码和数据都替换
+
+int execl(const char *path, const char *arg1, ...)
+path:新运行的程序名,要带路径
+arg1-argn:被执行程序所需要的参数，含程序名，以NULL结束 
+例子:
+execl("/bin/ls", "ls", "-al", "/etc/passwd", (char *)0);
+
+int execlp(const char *path, const char *arg1, ...)
+path: 被执行程序名，不含路径，将从path环境变量中找该程序
+execl("ls", "ls", "-al", "/etc/passwd", (char *)0);
+
+int execv(const char *path, char * const arg[])
+path: 完整路径
+char *argv[] = {"ls","-l",0}
+execv("/bin/ls", argv);
+
+int system(const char * string)
+功能:调用fork产生子进程，由子进程来调用/bin/sh -c string来执行参数string所代表的命令
+system("ls -l"); 这个命令是在子进程中运行的
+
+进程等待
+pid_t wait(int *status)
+功能:阻塞该进程，直到某个子进程退出。
+返回:退出的子进程的pid
+
+***************************************************
+进程间通信
+为什么进程间要通信？
+1.数据传输，我生产第一道工序，然后传输给下一个进程进行下一道工序
+2.资源共享，
+3.通知事件，进程同步
+4.进程控制，调试进程的时候，当前进程要对另外一个进程进行控制
+
+Linux进程间的通信： IPC
+POSIX:Portable Operating System Interface,可移植操作系统接口。
+
+IPC通信方式包括:
+1.管道pipe和有名管道FIFO
+2.信号 signal
+3.消息队列
+4.共享内存
+5.信号量
+6.套接字 socket
+
+管道通信
+管道是单向的，先进先出的。把一个进程的输出和一个进程的输入连接。
+写要写入管道的尾部，读要从管道的头部读出 。
+无名管道：用于父子进程间通信
+有名管道：任何进程间通信
+
+int pipe(int filedis[2])
+当一个管道创建的时候，它会创建两个文件描述符
+filedis[0]:用于读管道
+filedis[1]:用于写管道
+
+关闭管道，只需要close这两个文件描述符就可以了。
+
+读写模型：
+父进程先创建pipe，然后fork创建子进程，那么子进程就继承管道文件描述符。
+管道只有一个，进程有两个
+pipe(pipe_fd)
+if (pid=fork()==0)
+{
+    close(pipe_fd[1]);//不操作写，所以子进程关了这个文件
+	sleep(2);
+	read(pipe_fd[0], buffer, 5);
+	close(pipe_fd[0]);
+}
+else
+{
+    close(pipe_fd[0]);//不打算读出，所以在父进程关了这个文件
+	write(pipe_fd[1], "hello", 5);
+	wait(NULL);
+	close(pipe_fd[1]);
+}
+
+有名管道FIFO
+实际上有名管道就是一个文件
+int mkfifo(const char *pathname, mode_t mode)
+pathname:FIFO 文件名
+mode: 文件属性
+一旦创建了一个FIFO，就可以用open打开它，一般的文件访问函数都可以用于FIFO。
+
+O_NONBLOCK:读取空管道也不会阻塞
+第一个进程:
+mkfifo 创建管道
+open
+read
+unlink(FIFO);//删除FIFO 文件
+第二个进程：
+open 上一个进程创建的管道
+write
+************************************************
+信号 
+常见信号类型
+SIGHUP: 
+SIGINT: 来自键盘中断信号(Ctrl-C)，键盘产生这个信号来中止进程
+SIGSTOP:
+
+信号处理3种方式
+1.忽略，但是有两种信号是不能忽略的，SIGKILL, SIGSTOP
+2.执行用户希望的动作
+3.执行系统默认动作
+-大多数信号的默认处理是杀掉进程
+
+信号的发送
+kill:可以给自己发，也可以给别人发
+raise：只能给自己发
+#include <signal.h>
+int kill(pid_t pid, int signo)
+int raise(int signo)
+
+unsigned int alarm(unsigned int seconds)
+时间到就会产生一个SIGALRM信号给自己。
+int pause(void)
+-进程等待，直到等待到收到一个信号
+
+指定信号的响应函数
+void (* signal(int signo, void(* func)(int)))(int)
+返回类型还是一个指针
+分解：
+typedef void(*sighandler_t)(int)
+sighandler_t signal(int signum, sighandler_t handler)
+func可能的值：
+*SIG_IGN， 忽略
+*SIG_DFL,默认处理 
+*信号处理函数名
+
+ps -la: 查看所有进程 
+
+kill -s SIGINT 7537; 7537是接收信号的进程ID
+**************************************************
+共享内存
+访问比pipe和fifo快，内存比文件快，没什么read write接口
+*创建共享内存
+-shmget
+*映射共享内存，将这段创建的共享内存映射到具体的进程空间
+-shmat
+*操作共享内存
+*删除共享内存
+-shmdt
+
+int shmget(key_t key, int size, int shmflg)
+key: IPC_PRIVATE,将创建一块新的共享内存；
+
+int shmat(int shmid, char *shmaddr, int flg)
+shmid: shmget返回的共享内存标识
+shmaddr:输出，在进程中的地址
+flg:决定以什么方式来确定映射的地址，通常为0
+返回映射地址
+
+int shmdt(char *shmaddr)
+解除内存映射,目的和shmat 相反
+
+真正删除内存可以使用
+int shmctl(int shmid, int cmd, struct shmid_ds *buf)
+shmctl(shmid, IPC_RMID, NULL)
+
+**************************************************
+消息队列
+信号传输的信息量非常有限，管道则只能传送无格式的字节流。
+消息队列其实就是一个消息的链表，具有固定的格式。
+共享内存，读了之后，内容还存在，消息队列读了之后，消息就没了。
+目前有两种消息队列：
+*POSIX消息队列
+*系统V消息队列
+-内核重新启动，人工删除，消息队列才会被清除
+-每个消息队列都有唯一的键值，要获得一个消息队列的描述字，必须提供键值
+
+key_t ftok(char *pathname, char proj)
+功能：返回文件名对应的键值
+
+消息队列也对应一个文件。
+
+pathname: 文件名
+proj: 不为0即可
+
+打开或创建消息队列的描述字：
+int msgget(key_t key, int msgflg);
+msgflg:
+IPC_CREAT, 
+-创建新的消息队列
+
+IPC_EXCL:
+-如果我要创建的消息队列已经存在，则返回错误，一般与IPC_CREAT一起用
+
+IPC_NOWAIT
+-读写消息队列要求无法满足时，不阻塞
+
+两种方式创建：
+-IPC_CREAT, 如果系统中没有，则创建新的消息队列
+-IPC_PRIVATE，
+
+int msgsnd(int msqid, struct msgbuf *msgp, int msgsz, int msgflg)
+msgflg: 标志，IPC_NOWAIT
+msgsz: 是指msgp->mtext 的长度
+
+struct msgbuf
+{
+long mtype;
+char mtext[1];//消息数据的首地址，仅仅是一个地址
+}
+
+接收消息：
+int msgrcv(int msqid, struct msgbuf *msgp, int msgsz, long msgtyp, int msgflg)
+成功的读取一条消息之后，会把这条消息删除
+************************************************
+信号量
+主要用途是保护临界资源，互斥或同步
+分类：
+*二值信号量，0或1
+*计数信号量：资源可以有多个
+
+信号量都是以集合来操作的。
+int semget(key_t key, int nsems, int semflg)
+key: 键值，由ftok获得
+nsems:创建的信号量集合有多少个信号量
+semflg: 与消息队列一样
+
+对信号量进行控制：
+struct sembuf
+{
+unsigned short sem_num; //semaphore index in array
+short sem_op; //semaphore operation
+short sem_flg; //IPC_NOWAIT, 默认是等待的
+};
+int semop(int semid, struct sembuf *buf, unsigned nsops)
+buf, 操作数组
+nsops，有多少个操作
+实例:
+*获得信号量数组,调用sem_id=semget(1234,1,0666|IPC_CREAT);获得信号量数组，数组里面只有一个信号量元素
+*初始化信号量数组，调用semctl(sem_id,0,SETVAL,sem_union)对信号量数组进行初始化, 在信号数组里面设置第0个信号量的值为sem_union, 通常为1
+-sem_union.val=1；设置第0个信号量的初始值为1
+
+*P操作，调用semop(sem_id, &sem_b,1), 操作内容如下
+-sem_b.sem_num=0;操作信号量数组里面的第几个信号量
+-sem_b.sem_op=-1;进行P操作
+-sem_b_sem_flag=SEM_UNDO; 进程挂掉，系统会回收这个信号量
+
+*V操作，调用semop(sem_id, &sem_b, 1),操作内容如下
+-sem_b.sem_num=0;操作信号量数组里面的第几个信号量
+-sem_b.sem_op=1;进行V操作
+-sem_b_sem_flag=SEM_UNDO; 进程挂掉，系统会回收这个信号量
+
+*删除信号量数组，调用semctl(sem_id, 0, IPC_RMID, sem_union), 对信号量数组的第0个信号量元素，设置值为0
+
+在一个进程中，通过key获得sem_id, 在一个进程中使用相同的sem_id,不同的进程sem_id不同，
+但是代表的是相同的信号量，因为都是来源于同一个key值。
+************************************************
+多线程
+为什么有了进程还引入线程呢？
+*比进程更加节俭
+fork，代码共享，但是数据和堆栈都要拷贝
+如果用线程，所有东西都是共享的。
+
+线程间切换比进程间切换快。一个进程的开销大约是一个线程开销的30倍。
+Linux系统下的多线程遵循POSIX线程接口，称为pthread.
+头文件pthread.h, libpthread.a
+
+要使用pthread要执行:
+apt-get install libbsd-dev
+apt-get install glibc-doc
+apt-get install manpages-posix-dev
+
+************************************************
+多线程程序设计
+int pthread_create(pthread_t *tidp, const pthread_attr_t *attr, void *(start_rtn)(void), void *arg)
+
+编译
+因为pthread的库不是linux系统的库，所以在编译的时候要加上-lpthread
+gcc hello.c -lpthread
+
+进程结束，属于它的线程也会终止 。
+如果在进程中任何一个线程中调用exit或_exit，那么整个进程会中止
+线程正常退出：
+*return
+*线程可以被另外一个进程中止
+*线程自己可以用pthread_exit
+
+线程等待
+int pthread_join(pthread_t tid, void ** rval_ptr)
+功能：阻塞调用线程，直到指定的线程终止
+
+线程标识
+pthread_t pthread_self(void)
+功能：得到当前线程的id
+
+线程非正常中止(不包括return)，存在资源释放的问题
+void pthread_cleanup_push(void (*rtn)(void *), void *arg)
+rtn: 清除函数
+arg: 清除函数参数
+void pthread_cleanup_pop(int execute)
+功能： 将清除函数弹出
+execute： 是否弹出清除函数的同时，执行清除函数，1：执行，0：不执行
+其实就是把一个清理函数压入堆栈，如果保护起来的代码异常终止，那终止之前就会调用这个清理函数，如果是return退出，则不会调用清理函数
+pthread_exit方式退出会调用清除函数
+
+************************************************
+Linux网络概述
+*强大而完善的网络功能。 协议丰富，和内核密切联系在一起。
+*很多免费的网络软件
+*远程访问支持 ssh telnet
+*安全可靠
+
+Linux网络模型：TCP/IP参考模型
+应用层：应用层，表示层，会话层
+传输层：传输层
+网络层：网络层：
+网络接口层：数据链路层，物理层
+
+网络层主要协议：IP，ARP,ICMP
+传输层：TCP,UDP
+应用层：ftp，tftp，dns，smtp，telnet
+
+以太网层包头
+目的物理地址：源物理地址：后面数据的类型：数据：校验和
+
+IP包的功能：无连接的
+*数据传送
+*寻址
+*路由选择
+*数据报文的分段
+
+IP协议头：
+
+TCP协议：源端口，目的端口，序号，窗口
+
+UDP：无连接的传输协议
+-源端口，目的端口，序号，窗口
+
+*********************************************************
+linux网络编程基础
+Socket
+linux的网络编程通过socket实现，socket是一种文件描述符。
+socket有3种类型：
+*流式套接字(SOCK_STREAM, 工作在传输层，可靠的)
+-它使用TCP协议。
+
+*数据包套接字(SOCK_DGRAM，工作在传输层， 不可靠的)
+-走的是UDP
+
+*原始套接字(SOCK_RAW，工作在网络层)
+-直接使用IP协议的
+
+网络地址：
+struct sockaddr
+{
+u_short sa_family;//指明协议类型
+char sa_data[14];//地址
+};
+
+struct sockaddr_in
+{
+short int sin_family;//协议类型,ip 或 udp 或 tcp
+unsigned short int sin_port;//端口号
+struct in_addr sin_addr;//指定地址，32bit记录ip地址
+unsigned char sin_zero[8];//填0
+};
+
+//字符串形ip地址转换成32位整数地址
+192.168.1.103->0xdd345322
+int inet_aton(const char *cp, struct in_addr *inp)
+
+192.168.1.103<-0xdd345322
+char *inet_ntoa(struct in_addr in)
+
+网络传输是以大端传输的
+
+字节序转换函数：
+htons
+htonl
+ntohs
+ntohl
+
+IP与主机名；
+struct hostent *gethostbyname(const char *hostname)
+struct hostent
+{
+char *h_name;//主机的正式名字
+char *h_aliases;//主机的别名
+int h_addrtype;//主机的地址类型
+int h_length;//主机地址长度
+char ** h_addr_list;//主机的ip地址列表
+}
+
+socket编程函数
+*socketall = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)
+-创建一个socket
+
+*bind(socketall, (struct sockaddr_in *)&server_addr, sizeof(server_addr)
+-用于IP地址和端口号和socket绑定起来
+
+*connect(socketid, &server_addr, sizeof(server_addr)
+-用于与服务器连接，发起第一次握手，并等待ack(第二次握手)，接受到ack后发起第三次握手并返回
+
+listen(socketall, 50)
+-设置为被动模式，设置服务器允许最大连接数,会立刻返回
+
+*socketclient = accept(socketall, &client_addr, &size)
+-size是输入参数，一定要填写。等待来自客户端的socket连接请求，接收第一次握手，并发送ack(第二次握手),并等待ack(第三次握手)，接收到第三次握手后返回
+
+*write(socketclient, hello, strlen(hello));
+*send
+-发送数据
+
+*read(socketid, buffer, 100);
+*recv
+-接收数据
+
+*********************************************************
+TCP网络程序设计
+基于tcp服务器端程序
+*创建一个socket
+*绑定ip地址，端口等信息到socket上，用bind函数(指定从本机那个网卡ip和端口监听数据)
+*设置允许的最大连接数，用listen函数
+*启动监听客户端的连接请求，用函数accept函数
+*收发数据，send和recv或read write
+*关闭网络
+
+基于tcp客户端程序
+*创建一个socket
+*设置要连接的服务器ip地址和端口等属性，服务器ip和端口
+*连接服务器，用connect
+*收发数据，send和recv或read
+*关闭网络
+
+有一个图，可以参考pdf
+****************************************************
+基于UDP的网络程序设计
+基于UDP服务器
+*创建socket
+*bind，决定服务器进程和ip，端口绑定
+*recvfrom
+*关闭网络连接
+
+基于UDP-客户端
+*创建一个socket
+*设置服务器ip，端口
+*发送数据，sendto
+*关闭网络
+**********************************************
+服务器模型
+*循环服务器，同一时刻可以响应一个客户请求
+-只有一个进程在服务
+*并发服务器，同一时刻可以响应多个客户请求，一个请求触发创建一个新的进程来处理服务
+
+UDP循环服务器
+socket()
+bind()
+while(1)
+{
+recv
+process
+sendto
+}
+
+TCP循环服务器
+socket()
+bind()
+listen
+while(1)
+{
+accept
+read
+process
+}
+
+TCP的服务器只要被一个客户端连上了，另外一个客户就无法连接，服务器被占住 了
+但是UDP的服务器没有连接的概念，可以多个客户端访问
+
+TCP并发服务器
+socket()
+bind()
+listen()
+while(1)
+{
+accept();
+if (fork() == 0)
+{
+	process();
+	close()
+	exit();
+}
+else
+{
+close()
+}
+}
